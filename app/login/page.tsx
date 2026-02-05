@@ -7,19 +7,26 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+const ADMIN_EMAILS = ["riterapublishing@gmail.com"];
+ const handleLogin = async () => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
-  const handleLogin = async () => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+  if (error) {
+    setError(error.message);
+    return;
+  }
 
-    if (error) {
-      setError(error.message);
-    } else {
-      window.location.href = "/dashboard";
-    }
-  };
+  const userEmail = data.user.email;
+
+  if (ADMIN_EMAILS.includes(userEmail || "")) {
+    window.location.href = "/admin";
+  } else {
+    window.location.href = "/dashboard";
+  }
+};
 
   return (
     <div className="flex min-h-screen items-center justify-center">
