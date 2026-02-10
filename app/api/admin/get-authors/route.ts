@@ -7,10 +7,14 @@ const supabaseAdmin = createClient(
 );
 
 export async function GET() {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("authors")
     .select("id, name")
     .order("created_at", { ascending: false });
+
+  if (error) {
+    return NextResponse.json([], { status: 500 });
+  }
 
   return NextResponse.json(data || []);
 }

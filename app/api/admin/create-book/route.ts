@@ -8,8 +8,13 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: Request) {
   try {
-    const { author_id, title } = await req.json();
+    const {
+      author_id,
+      title,
+      cover_url, // 👈 optional
+    } = await req.json();
 
+    // ---------------- VALIDATION ----------------
     if (!author_id || !title) {
       return NextResponse.json(
         { error: "Author and title are required" },
@@ -17,12 +22,18 @@ export async function POST(req: Request) {
       );
     }
 
-    const { error } = await supabaseAdmin.from("books").insert({
-      author_id,
-      title,
-    });
+    // ---------------- INSERT BOOK ----------------
+    const { error } = await supabaseAdmin
+      .from("books")
+      .insert({
+        id: crypto.randomUUID(),   // primary key
+        author_id,                // authors.id
+        title,
+        cover_url: cover_url || null, // 👈 safe default
+      });
 
     if (error) {
+      console.error("CREATE BOOK ERROR:", error);
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
@@ -30,7 +41,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error("CREATE BOOK API ERROR:", err);
     return NextResponse.json(
       { error: "Something went wrong" },
       { status: 500 }

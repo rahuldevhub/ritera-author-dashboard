@@ -16,14 +16,20 @@ export default function AddSalePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  // Load authors
   useEffect(() => {
     fetch("/api/admin/get-authors")
       .then((res) => res.json())
       .then(setAuthors);
   }, []);
 
+  // Load books when author changes
   useEffect(() => {
-    if (!authorId) return;
+    if (!authorId) {
+      setBooks([]);
+      setBookId("");
+      return;
+    }
 
     fetch(`/api/admin/get-books?author_id=${authorId}`)
       .then((res) => res.json())
@@ -38,7 +44,11 @@ export default function AddSalePage() {
     const res = await fetch("/api/admin/create-sale", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ book_id: bookId, copies, amount }),
+      body: JSON.stringify({
+        book_id: bookId,
+        copies,
+        amount,
+      }),
     });
 
     const data = await res.json();
@@ -49,6 +59,7 @@ export default function AddSalePage() {
       setMessage("Sales added successfully 💰");
       setCopies(0);
       setAmount(0);
+      setBookId("");
     }
 
     setLoading(false);
@@ -57,10 +68,7 @@ export default function AddSalePage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-5 rounded-2xl bg-white p-6 shadow-sm border">
-
-        <h1 className="text-xl font-semibold text-gray-900">
-          Add Sales
-        </h1>
+        <h1 className="text-xl font-semibold text-gray-900">Add Sales</h1>
 
         {message && (
           <p className="text-sm text-green-700 bg-green-100 p-2 rounded">
@@ -68,49 +76,58 @@ export default function AddSalePage() {
           </p>
         )}
         {error && (
-          <p className="text-sm text-red-700 bg-red-100 p-2 rounded">
-            {error}
-          </p>
+          <p className="text-sm text-red-700 bg-red-100 p-2 rounded">{error}</p>
         )}
 
         <select
-          className="w-full rounded-lg border border-gray-300 p-2 text-gray-900"
+          className="w-full rounded-lg border p-2 bg-white text-gray-900 disabled:bg-white disabled:text-gray-900 disabled:opacity-100"
           value={authorId}
           onChange={(e) => setAuthorId(e.target.value)}
         >
           <option value="">Select Author</option>
           {authors.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
           ))}
         </select>
 
         <select
-          className="w-full rounded-lg border border-gray-300 p-2 text-gray-900"
+          className="w-full rounded-lg border p-2 bg-white text-gray-900 disabled:bg-white disabled:text-gray-900 disabled:opacity-100"
           value={bookId}
           onChange={(e) => setBookId(e.target.value)}
-          disabled={!authorId}
+          disabled={!authorId || books.length === 0}
         >
-          <option value="">Select Book</option>
+          <option value="">
+            {books.length ? "Select Book" : "No books found"}
+          </option>
           {books.map((b) => (
-            <option key={b.id} value={b.id}>{b.title}</option>
+            <option key={b.id} value={b.id}>
+              {b.title}
+            </option>
           ))}
         </select>
 
-        <input
-          type="number"
-          placeholder="Copies Sold"
-          className="w-full rounded-lg border p-2 text-gray-900 placeholder-gray-600"
-          value={copies}
-          onChange={(e) => setCopies(Number(e.target.value))}
-        />
-
-        <input
-          type="number"
-          placeholder="Amount Earned"
-          className="w-full rounded-lg border p-2 text-gray-900 placeholder-gray-600"
-          value={amount}
-          onChange={(e) => setAmount(Number(e.target.value))}
-        />
+        <div className="space-y-1">
+          <p className="text-sm text-gray-500">Copies Sold</p>
+          <input
+            // type="number"
+            placeholder="Copies Sold"
+            className="w-full rounded-lg border p-2 bg-white text-gray-900 disabled:bg-white disabled:text-gray-900 disabled:opacity-100"
+            value={copies}
+            onChange={(e) => setCopies(Number(e.target.value))}
+          />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm text-gray-500">Amount Earned</p>
+          <input
+            // type="number"
+            placeholder="Amount Earned"
+            className="w-full rounded-lg border p-2 bg-white text-gray-900 disabled:bg-white disabled:text-gray-900 disabled:opacity-100"
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value))}
+          />
+        </div>
 
         <button
           onClick={handleSubmit}

@@ -8,14 +8,24 @@ const supabaseAdmin = createClient(
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const author_id = searchParams.get("author_id");
+  const authorId = searchParams.get("author_id");
 
-  if (!author_id) return NextResponse.json([]);
+  if (!authorId) {
+    return NextResponse.json([]);
+  }
 
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("books")
     .select("id, title")
-    .eq("author_id", author_id);
+    .eq("author_id", authorId)
+    .order("title");
 
-  return NextResponse.json(data || []);
+  if (error) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 400 }
+    );
+  }
+
+  return NextResponse.json(data);
 }

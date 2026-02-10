@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 type BookStat = {
   id: string;
   title: string;
+  cover_url: string | null;
   copies: number;
   amount: number;
 };
@@ -23,6 +24,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const loadData = async () => {
+      // 1️⃣ Get session
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -33,62 +35,73 @@ export default function DashboardPage() {
       }
 
       const userId = session.user.id;
+      if (!userId) {
+        console.error("User ID missing");
+        setLoading(false);
+        return;
+      }
 
-      // Author
-      const { data: author } = await supabase
+      // 2️⃣ Get author profile
+      const { data: author, error: authorError } = await supabase
         .from("authors")
-        .select("name")
-        .eq("id", userId)
-        .single();
+        .select("id, name")
+        .eq("auth_user_id", userId)
+        .single(); // ✅ SAFE
 
-      setAuthorName(author?.name || "");
+      if (authorError || !author) {
+        console.error("Author not found", authorError);
+        setLoading(false);
+        return;
+      }
 
-      // Wallet
+      const authorId = author.id;
+      setAuthorName(author.name);
+
+      // 3️⃣ Wallet (SAFE)
       const { data: wallet } = await supabase
         .from("wallet")
         .select("balance")
-        .eq("author_id", userId)
-        .single();
+        .eq("author_id", authorId)
+        .maybeSingle(); // ✅ SAFE
 
-      // Books
+      // 4️⃣ Books
       const { data: books } = await supabase
         .from("books")
-        .select("id, title")
-        .eq("author_id", userId);
+        .select("id, title, cover_url")
+        .eq("author_id", authorId)
+        .order("created_at", { ascending: false });
 
       let totalCopies = 0;
       let totalAmount = 0;
 
-      const bookData: BookStat[] =
-        (await Promise.all(
-          books?.map(async (book) => {
-            const { data: sales } = await supabase
-              .from("sales")
-              .select("copies, amount")
-              .eq("book_id", book.id);
+      const bookData: BookStat[] = await Promise.all(
+        (books || []).map(async (book) => {
+          const { data: sales } = await supabase
+            .from("sales")
+            .select("copies, amount")
+            .eq("book_id", book.id);
 
-            const copies =
-              sales?.reduce((a, b) => a + b.copies, 0) || 0;
-            const amount =
-              sales?.reduce((a, b) => a + b.amount, 0) || 0;
+          const copies = sales?.reduce((sum, s) => sum + s.copies, 0) || 0;
+          const amount = sales?.reduce((sum, s) => sum + s.amount, 0) || 0;
 
-            totalCopies += copies;
-            totalAmount += amount;
+          totalCopies += copies;
+          totalAmount += amount;
 
-            return {
-              id: book.id,
-              title: book.title,
-              copies,
-              amount,
-            };
-          }) || []
-        )) as BookStat[];
+          return {
+            id: book.id,
+            title: book.title,
+            cover_url: book.cover_url ?? null,
+            copies,
+            amount,
+          };
+        }),
+      );
 
       setBookStats(bookData);
 
       setStats({
         earnings: totalAmount,
-        balance: wallet?.balance || 0,
+        balance: wallet?.balance ?? 0, // ✅ SAFE DEFAULT
         copies: totalCopies,
         books: books?.length || 0,
       });
@@ -106,7 +119,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8 py-8 space-y-8">
-
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -147,9 +159,7 @@ export default function DashboardPage() {
           </p>
 
           {bookStats.length === 0 ? (
-            <p className="text-sm text-gray-500">
-              No books available yet.
-            </p>
+            <p className="text-sm text-gray-500">No books available yet.</p>
           ) : (
             <div className="space-y-4">
               {bookStats.map((book) => (
@@ -158,30 +168,26 @@ export default function DashboardPage() {
                   className="flex items-center justify-between rounded-xl border bg-white p-4 shadow-sm"
                 >
                   <div className="flex items-center gap-4">
-                    {/* Book Cover Placeholder */}
-                    <div className="h-16 w-12 rounded-md bg-gray-200 flex items-center justify-center text-xs text-gray-500">
-                      Cover
-                    </div>
+                    <img
+                      src={book.cover_url || "/file.svg"}
+                      alt={book.title}
+                      className="h-16 w-12 rounded-md object-cover"
+                    />
 
                     <div>
-                      <p className="font-medium text-gray-900">
-                        {book.title}
-                      </p>
+                      <p className="font-medium text-gray-900">{book.title}</p>
                       <p className="text-sm text-gray-500">
                         Copies Sold: {book.copies}
                       </p>
                     </div>
                   </div>
 
-                  <p className="font-semibold text-gray-900">
-                    ₹ {book.amount}
-                  </p>
+                  <p className="font-semibold text-gray-900">₹ {book.amount}</p>
                 </div>
               ))}
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
@@ -189,19 +195,11 @@ export default function DashboardPage() {
 
 /* ---------- Components ---------- */
 
-function StatCard({
-  title,
-  value,
-}: {
-  title: string;
-  value: string | number;
-}) {
+function StatCard({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="rounded-xl bg-white p-5 shadow-sm border border-gray-100">
       <p className="text-sm text-gray-500">{title}</p>
-      <p className="mt-2 text-2xl font-semibold text-gray-900">
-        {value}
-      </p>
+      <p className="mt-2 text-2xl font-semibold text-gray-900">{value}</p>
     </div>
   );
 }

@@ -9,7 +9,7 @@ export default function CreateAuthorPage() {
     name: "",
     email: "",
     password: "",
-    royalty: 50,
+    royalty: 100, // 🔒 FIXED
 
     bank_account_name: "",
     bank_account_number: "",
@@ -26,7 +26,7 @@ export default function CreateAuthorPage() {
   const [error, setError] = useState("");
 
   // ---------------- LOAD EDIT DATA ----------------
-  // 👇 THIS IS WHAT YOU ASKED ABOUT
+
   useEffect(() => {
     const data = sessionStorage.getItem("editAuthor");
     if (!data) return;
@@ -37,7 +37,7 @@ export default function CreateAuthorPage() {
       name: author.name || "",
       email: author.email || "",
       password: "", // never prefill password
-      royalty: author.royalty_percentage || 50,
+      royalty: 100, // 🔒 FORCE 100 even in edit
 
       bank_account_name: author.bank_account_name || "",
       bank_account_number: author.bank_account_number || "",
@@ -60,14 +60,19 @@ export default function CreateAuthorPage() {
     setError("");
 
     try {
+      const payload = {
+        ...form,
+        royalty: 100, // 🔒 FINAL SAFETY LOCK
+      };
+
       const res = await fetch(
         isEdit
-          ? `/api/admin/authors/${authorId}` // UPDATE
-          : "/api/admin/create-author",      // CREATE
+          ? `/api/admin/authors/${authorId}`
+          : "/api/admin/create-author",
         {
           method: isEdit ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         }
       );
 
@@ -87,7 +92,7 @@ export default function CreateAuthorPage() {
             name: "",
             email: "",
             password: "",
-            royalty: 50,
+            royalty: 100,
 
             bank_account_name: "",
             bank_account_number: "",
@@ -110,7 +115,6 @@ export default function CreateAuthorPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-5 rounded-2xl bg-white p-6 shadow-sm border">
-
         <h1 className="text-xl font-semibold text-gray-900">
           {isEdit ? "Edit Author" : "Create Author"}
         </h1>
@@ -131,18 +135,14 @@ export default function CreateAuthorPage() {
           placeholder="Author Name"
           className="input"
           value={form.name}
-          onChange={(e) =>
-            setForm({ ...form, name: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
 
         <input
           placeholder="Email"
           className="input"
           value={form.email}
-          onChange={(e) =>
-            setForm({ ...form, email: e.target.value })
-          }
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
         />
 
         {!isEdit && (
@@ -156,18 +156,22 @@ export default function CreateAuthorPage() {
           />
         )}
 
-        <input
-          type="number"
-          placeholder="Royalty %"
-          className="input"
-          value={form.royalty}
-          onChange={(e) =>
-            setForm({ ...form, royalty: Number(e.target.value) })
-          }
-        />
+        {/* ROYALTY (LOCKED) */}
+        <div className="space-y-1">
+          <p className="text-sm text-gray-500">
+            Royalty is fixed at 100% for now
+          </p>
+          <input
+            type="number"
+            className="input bg-gray-100 text-gray-700 cursor-not-allowed"
+            value={100}
+            readOnly
+          />
+        </div>
 
-        <div className="pt-3 border-t">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">
+        {/* BANK DETAILS */}
+        <div className="pt-3 border-t space-y-5">
+          <h2 className="text-sm font-semibold text-gray-700">
             Bank Details
           </h2>
 
