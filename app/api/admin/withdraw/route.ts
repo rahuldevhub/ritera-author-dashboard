@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const { data: wallet } = await supabase
       .from("wallet")
       .select("*")
-      .eq("author_id", author.auth_user_id)
+      .eq("author_id", author.id)
       .single();
 
     if (!wallet) {
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
         balance: 0,
         paid: wallet.paid + amount,
       })
-      .eq("author_id", author.auth_user_id);
+      .eq("author_id", author.id);
 
     // 5️⃣ Send Mail (non-blocking safe version)
     try {

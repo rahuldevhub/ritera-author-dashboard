@@ -58,71 +58,72 @@ export default function DashboardPage() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-
+  
       if (!session) {
         window.location.href = "/login";
         return;
       }
-
+  
       const userId = session.user.id;
-
-      // 1️⃣ Get author profile
+  
+      // 1️⃣ Get author profile (NO BANK FIELDS HERE)
       const { data: author } = await supabase
         .from("authors")
-        .select(
-          `
-          id,
-          auth_user_id,
-          name,
-          bank_account_name,
-          bank_account_number,
-          bank_name,
-          ifsc_code,
-          upi_id
-        `
-        )
+        .select("id, auth_user_id, name")
         .eq("auth_user_id", userId)
         .single();
-
+  
       if (!author) {
         setLoading(false);
         return;
       }
-
+  
       setAuthorId(author.id);
       setAuthorName(author.name);
-      setBankDetails(author);
-
-      // ✅ FIXED Wallet Query
+  
+      // 2️⃣ Get bank details from new table
+      const bankRes = await fetch("/api/admin/authors/bank-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authorId: author.id }),
+      });
+      
+      const bankData = await bankRes.json();
+      
+      if (!bankData.error) {
+        setBankDetails(bankData);
+      }
+  
+      // 3️⃣ Wallet
       const { data: wallet } = await supabase
         .from("wallet")
         .select("balance")
-        .eq("author_id", author.auth_user_id)
+        .eq("author_id", author.id)
         .single();
-
-      // 3️⃣ Books
+  
+      // 4️⃣ Books
       const { data: books } = await supabase
         .from("books")
         .select("id, title, cover_url")
         .eq("author_id", author.id)
         .order("created_at", { ascending: false });
-
+  
       let totalCopies = 0;
       let totalAmount = 0;
-
+  
       const bookData: BookStat[] = await Promise.all(
         (books || []).map(async (book) => {
           const { data: sales } = await supabase
             .from("sales")
             .select("copies, amount")
             .eq("book_id", book.id);
-
+  
           const copies = sales?.reduce((sum, s) => sum + s.copies, 0) || 0;
           const amount = sales?.reduce((sum, s) => sum + s.amount, 0) || 0;
-
+  
           totalCopies += copies;
           totalAmount += amount;
-
+  
           return {
             id: book.id,
             title: book.title,
@@ -132,19 +133,19 @@ export default function DashboardPage() {
           };
         })
       );
-
+  
       setBookStats(bookData);
-
+  
       setStats({
         earnings: totalAmount,
         balance: wallet?.balance ?? 0,
         copies: totalCopies,
         books: books?.length || 0,
       });
-
+  
       setLoading(false);
     };
-
+  
     loadData();
   }, []);
 
@@ -323,6 +324,9 @@ function WithdrawModal({
         <p className="text-xs text-gray-500 mt-3">
           Your amount will be credited within 2 business days.
         </p>
+        <p className="text-xs text-gray-500 mt-1">
+        To update your bank details, please reach out to <b>support@riterapublishing.com</b> prior to withdrawal
+</p>
 
         <div className="mt-5 flex justify-end gap-3">
           <button

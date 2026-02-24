@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     const authorId = book.author_id;
 
-    // 2️⃣ Get author royalty
+    // 2️⃣ Get author royalty %
     const { data: author, error: authorError } = await supabaseAdmin
       .from("authors")
       .select("royalty_percentage")
@@ -53,27 +53,49 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: saleError.message }, { status: 400 });
     }
 
-    // 4️⃣ Wallet upsert
-    const { data: wallet, error: walletError } = await supabaseAdmin
+    // 4️⃣ Get wallet row
+    const { data: wallet } = await supabaseAdmin
       .from("wallet")
-      .select("balance")
+      .select("total_earned, paid, balance")
       .eq("author_id", authorId)
-      .maybeSingle(); // ✅ IMPORTANT
+      .maybeSingle();
 
     if (wallet) {
-      // Update wallet
-      await supabaseAdmin
+      // ✅ Update existing wallet
+      const newTotalEarned = (wallet.total_earned ?? 0) + royaltyAmount;
+      const newBalance = (wallet.balance ?? 0) + royaltyAmount;
+
+      const { error: updateError } = await supabaseAdmin
         .from("wallet")
         .update({
-          balance: wallet.balance + royaltyAmount,
+          total_earned: newTotalEarned,
+          balance: newBalance,
         })
         .eq("author_id", authorId);
+
+      if (updateError) {
+        return NextResponse.json(
+          { error: updateError.message },
+          { status: 400 },
+        );
+      }
     } else {
-      // Create wallet
-      await supabaseAdmin.from("wallet").insert({
-        author_id: authorId,
-        balance: royaltyAmount,
-      });
+      // ✅ Create new wallet row
+      const { error: insertError } = await supabaseAdmin
+        .from("wallet")
+        .insert({
+          author_id: authorId,
+          total_earned: royaltyAmount,
+          paid: 0,
+          balance: royaltyAmount,
+        });
+
+      if (insertError) {
+        return NextResponse.json(
+          { error: insertError.message },
+          { status: 400 },
+        );
+      }
     }
 
     return NextResponse.json({
@@ -81,6 +103,7 @@ export async function POST(req: Request) {
       royaltyAdded: royaltyAmount,
     });
   } catch (err) {
+    console.error("CREATE SALE ERROR:", err);
     return NextResponse.json(
       { error: "Something went wrong" },
       { status: 500 },

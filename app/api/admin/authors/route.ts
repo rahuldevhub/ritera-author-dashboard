@@ -9,9 +9,15 @@ const supabase = createClient(
 export async function GET() {
   const { data, error } = await supabase
     .from("authors")
-    .select(
-      "id, name, royalty_percentage, bank_verified, created_at"
-    )
+    .select(`
+      id,
+      name,
+      royalty_percentage,
+      created_at,
+      author_bank_details (
+        bank_verified
+      )
+    `)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -21,5 +27,12 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json(data);
+  const formatted = data.map((a: any) => ({
+    id: a.id,
+    name: a.name,
+    royalty_percentage: a.royalty_percentage,
+    bank_verified: a.author_bank_details?.[0]?.bank_verified ?? false,
+  }));
+
+  return NextResponse.json(formatted);
 }
